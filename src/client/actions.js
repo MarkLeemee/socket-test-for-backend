@@ -9,5 +9,7 @@ export const removeUser = createAction('remove user')
 export const newMessage = createAction('new message')
 export const sendMessage = createAction('send message')
 
-export const testTrigger = createAction('test trigger')
-export const testData = createAction('test data')
+export const newData = createAction('new data')
+export const sendData = createAction('send data')
+
+export const newEmit = createAction('new emit')
