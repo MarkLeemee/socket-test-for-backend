@@ -1,6 +1,6 @@
 import io from 'socket.io-client'
 import { eventChannel } from 'redux-saga'
-import { fork, take, call, put, cancel } from 'redux-saga/effects'
+import { fork, take, call, put, cancel, race, delay } from 'redux-saga/effects'
 import {
   login,
   logout,
@@ -55,15 +55,44 @@ function subscribe(socket) {
     socket.on(EVENT_NAME, ({ data }) => {
       console.log(`🐶🐶🐶 Client : eventName 🐶🐶🐶`, data)
     })
-    return () => {}
+    return function unsubscribe() {
+      socket.off('disconnect', emitter)
+    }
   })
 }
 
+function closeChannel(channel) {
+  if (channel) {
+    channel.close()
+  }
+}
+
+// matcher 활용 시 (임시 코드)
+// const matcher = action => action.headers.requester === MY_ID
+
 function* read(socket) {
+  // const channel = yield call(subscribe, socket, null, matcher)
   const channel = yield call(subscribe, socket)
   while (true) {
-    let action = yield take(channel)
-    yield put(action)
+    try {
+      // timeout (or debounce 등) 활용시
+      // const { timeout, action } = yield race({
+      //   timeout: delay(10000),
+      //   action: take(channel),
+      // })
+      // if (timeout) {
+      //   alert('timeout!!!')
+      // } else {
+      //   yield put(action)
+      // }
+      const action = yield take(channel)
+      yield put(action)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      // takeEvery 활용 시
+      // closeChannel(channel)
+    }
   }
 }
 
