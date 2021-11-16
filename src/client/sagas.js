@@ -12,9 +12,11 @@ import {
   newData,
   newEmit,
 } from './actions'
+import { HOST_NAME, EVENT_NAME } from './config'
 
 function connect() {
-  const socket = io('http://localhost:3000', {
+  // 👇👇👇 연결 호스트 및 네임스페이스 설정 👇👇👇
+  const socket = io(HOST_NAME, {
     path: '/socket',
     transports: ['websocket', 'polling', 'flashsocket'],
   })
@@ -50,7 +52,7 @@ function subscribe(socket) {
     })
 
     // 👇👇👇 eventName 및 data을 수정하여 활용 👇👇👇
-    socket.on('evnetName', ({ data }) => {
+    socket.on(EVENT_NAME, ({ data }) => {
       console.log(`🐶🐶🐶 Client : eventName 🐶🐶🐶`, data)
     })
     return () => {}
