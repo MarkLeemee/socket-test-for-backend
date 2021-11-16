@@ -6,6 +6,7 @@
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
+    "express": "^4.17.1",
     "material-ui": "^0.15.0-beta.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
@@ -15,14 +16,15 @@
     "redux-act": "^1.8.0",
     "redux-logger": "^3.0.6",
     "redux-saga": "^1.1.3",
+    "socket.io": "^4.3.2",
     "socket.io-client": "^4.3.2",
+    "styled-components": "^5.3.3",
     "web-vitals": "^1.0.1"
   },
   "scripts": {
-    "start": "export PORT=5000 && react-scripts start ",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "client": "export PORT=5000 && react-app-rewired start ",
+    "client-build": "react-app-rewired build",
+    "server": "node ./src/server/app.js"
   },
   "eslintConfig": {
     "extends": [
@@ -41,5 +43,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "react-app-rewired": "^2.1.8"
   }
 }

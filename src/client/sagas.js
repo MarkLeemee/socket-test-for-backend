@@ -8,8 +8,9 @@ import {
   removeUser,
   newMessage,
   sendMessage,
-  testTrigger,
-  testData,
+  sendData,
+  newData,
+  newEmit,
 } from './actions'
 
 function connect() {
@@ -19,7 +20,7 @@ function connect() {
   })
   return new Promise((resolve) => {
     socket.on('conncet', () => {
-      console.log('👍👍👍 연결 성공 👍👍👍')
+      console.log('🐶🐶🐶 Client : connected 🐶🐶🐶')
       resolve(socket)
     })
   })
@@ -27,27 +28,30 @@ function connect() {
 
 function subscribe(socket) {
   return eventChannel((emitter) => {
-    socket.on('S2C.login', (userInfo) => {
-      emitter(addUser(userInfo))
-    })
-    socket.on('S2C.logout', (userInfo) => {
-      emitter(removeUser(userInfo))
-    })
-    socket.on('S2C.message', (message) => {
-      emitter(newMessage(message))
-    })
-    socket.on('S2C.data', (data) => {
-      emitter(testData(data))
-    })
-    // eventName 및 data 인자 수정하여 활용
-    socket.on('evnetName', (data) => {
-      console.log(data)
-    })
-    socket.on('some', (e) => {
-      // ....
-    })
     socket.on('disconnect', (e) => {
-      // ....
+      console.log(`🐶🐶🐶 Client : disconnected 🐶🐶🐶`)
+      // 재연결 로직...
+    })
+    socket.on('S2C.login', ({ username }) => {
+      console.log(`🐶🐶🐶 Client : login success 🐶🐶🐶`)
+      emitter(addUser({ username }))
+    })
+    socket.on('S2C.logout', ({ username }) => {
+      console.log(`🐶🐶🐶 Client : logout success 🐶🐶🐶`)
+      emitter(removeUser({ username }))
+    })
+    socket.on('S2C.message', ({ message }) => {
+      console.log(`🐶🐶🐶 Client : message received 🐶🐶🐶`, message)
+      emitter(newMessage({ message }))
+    })
+    socket.on('S2C.data', ({ data }) => {
+      console.log(`🐶🐶🐶 Client : data eceived 🐶🐶🐶`, data)
+      emitter(newData({ data }))
+    })
+
+    // 👇👇👇 eventName 및 data을 수정하여 활용 👇👇👇
+    socket.on('evnetName', ({ data }) => {
+      console.log(`🐶🐶🐶 Client : eventName 🐶🐶🐶`, data)
     })
     return () => {}
   })
@@ -68,17 +72,25 @@ function* write(socket) {
   }
 }
 
-function* trigger(socket) {
+function* writeData(socket) {
   while (true) {
-    const { payload } = yield take(`${testTrigger}`)
+    const { payload } = yield take(`${sendData}`)
     socket.emit('C2S.data', { data: payload.data })
+  }
+}
+
+function* emitTrigger(socket) {
+  while (true) {
+    const { payload } = yield take(`${newEmit}`)
+    socket.emit(payload.event, { data: payload.data })
   }
 }
 
 function* handleIO(socket) {
   yield fork(read, socket)
   yield fork(write, socket)
-  yield fork(trigger, socket)
+  yield fork(writeData, socket)
+  yield fork(emitTrigger, socket)
 }
 
 function* flow() {

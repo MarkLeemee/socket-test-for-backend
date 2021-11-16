@@ -6,7 +6,7 @@ import {
   addUser,
   removeUser,
   newMessage,
-  testData,
+  newData,
 } from './actions'
 
 const initial = {
@@ -51,7 +51,6 @@ const messages = createReducer(
   {
     [newMessage]: (state, payload) => {
       const { message } = payload
-      console.log(message, 232323)
       return {
         ...state,
         list: [...state.list, message.id],
@@ -64,7 +63,7 @@ const messages = createReducer(
 
 const data = createReducer(
   {
-    [testData]: (state, payload) => {
+    [newData]: (state, payload) => {
       const { data } = payload
       return [...state, data]
     },
