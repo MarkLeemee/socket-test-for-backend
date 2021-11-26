@@ -1,5 +1,11 @@
 import { createAction } from 'redux-act'
 
+export const connectIO = createAction('connectIO')
+export const disconnectIO = createAction('disconnectIO')
+
+export const joinRoom = createAction('joinRoom')
+export const leaveRoom = createAction('leaveRoom')
+
 export const login = createAction('login')
 export const logout = createAction('logout')
 
