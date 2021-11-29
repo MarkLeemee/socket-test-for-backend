@@ -13,7 +13,7 @@ function closeChannel(channel) {
 }
 
 function connect(action) {
-  const { socketURL, socketRoom, namespaceEvnet, roomEvent, accessToken } =
+  const { socketURL, socketRoom, socketEvent, roomEvent, accessToken } =
     action.payload
   try {
     const socket = io(`${HOST_NAME}/${socketURL}`, {
@@ -30,7 +30,7 @@ function connect(action) {
       socket.on('connect', () => {
         socket.socketURL = socketURL
         socket.socketRoom = socketRoom
-        socket.namespaceEvnet = namespaceEvnet
+        socket.socketEvent = socketEvent
         socket.roomEvent = roomEvent
         socket.accessToken = accessToken
         socket.emit('C2S.joinRoom', socketRoom, () => {})
@@ -38,8 +38,6 @@ function connect(action) {
       })
       socket.on('connect_error', (err) => {
         reject(new Error(err?.msg))
-        // refreshToken 사용 시
-        // if (err?.code === '401')
       })
     })
   } catch (e) {
@@ -50,11 +48,21 @@ function connect(action) {
 }
 
 function subscribeSocket(socket) {
-  const { socketURL, socketEvent, accessToken } = socket
+  const { socketURL, socketRoom, socketEvent, roomEvent, accessToken } = socket
   return eventChannel((emitter) => {
-    socket.on('disconnect', (e) => {
+    socket.on('disconnect', (res) => {
       console.log(`🐶🐶🐶 Client : disconnected 🐶🐶🐶`)
-      emitter(connectIO({ socketURL, accessToken }))
+      if (res.msg) {
+        emitter(
+          connectIO({
+            socketURL,
+            socketRoom,
+            socketEvent,
+            roomEvent,
+            accessToken,
+          }),
+        )
+      }
     })
 
     socket.on('joinRoom', () => {
@@ -62,6 +70,10 @@ function subscribeSocket(socket) {
     })
 
     socket.on('refuseToJoin', () => {
+      emitter()
+    })
+
+    socket.on('leaveRoom', (e) => {
       emitter()
     })
 
@@ -77,6 +89,10 @@ function subscribeSocket(socket) {
 
     return function unsubscribe(socket, emitter) {
       socket.off('disconnect', emitter)
+      socket.off('joinRoom', emitter)
+      socket.off('refuseToJoin', emitter)
+      socket.off('ping', emitter)
+      _.map(socketEvent.listener, (item) => socket.off(item.name, emitter))
     }
   })
 }
@@ -90,7 +106,7 @@ function subscribeRoom(socket) {
     )
 
     return function unsubscribe(socket, emitter) {
-      socket.off('disconnect', emitter)
+      _.map(socket.roomEvent.listener, (item) => socket.off(item.name, emitter))
     }
   })
 }
