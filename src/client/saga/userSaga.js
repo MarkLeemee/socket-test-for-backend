@@ -1,26 +1,10 @@
 import io from 'socket.io-client'
-import { eventChannel } from 'redux-saga'
-import { fork, take, call, put, cancel, race, delay } from 'redux-saga/effects'
-import {
-  connectIO,
-  disconnectIO,
-  joinRoom,
-  leaveRoom,
-  login,
-  logout,
-  addUser,
-  removeUser,
-  newMessage,
-  sendMessage,
-  sendData,
-  newData,
-  newEmit,
-} from './actions'
-import { HOST_NAME, EVENT_NAME } from './config'
+import _ from 'lodash'
+import { eventChannel, takeEvery } from 'redux-saga'
+import { fork, take, call, put, cancel, race } from 'redux-saga/effects'
 
-const getAccessToken = () => 'ACtoken'
-const getRefreshToken = () => 'REtoken'
-const redirect = (route) => console.log(`to ${route}`)
+import { connectIO, disconnectIO, joinRoom, leaveRoom } from './actions'
+import { HOST_NAME } from '../config'
 
 function closeChannel(channel) {
   if (channel) {
@@ -29,8 +13,10 @@ function closeChannel(channel) {
 }
 
 function connect(action) {
+  const { socketURL, socketRoom, namespaceEvnet, roomEvent, accessToken } =
+    action.payload
   try {
-    const socket = io(HOST_NAME, {
+    const socket = io(`${HOST_NAME}/${socketURL}`, {
       // path: '/socket',
       // withCredentials: true,
       reconnection: true,
@@ -38,22 +24,22 @@ function connect(action) {
       reconnectionDelay: 1000,
       timeout: 10000,
       transports: ['websocket', 'polling', 'flashsocket'],
-      auth: { token: `Bearer ${action?.payload?.accessToken}` },
+      auth: { token: `Bearer ${accessToken}` },
     })
     return new Promise((resolve, reject) => {
       socket.on('connect', () => {
+        socket.socketURL = socketURL
+        socket.socketRoom = socketRoom
+        socket.namespaceEvnet = namespaceEvnet
+        socket.roomEvent = roomEvent
+        socket.accessToken = accessToken
+        socket.emit('C2S.joinRoom', socketRoom, () => {})
         resolve(socket)
       })
       socket.on('connect_error', (err) => {
-        if (err?.code === '401') {
-          try {
-            return connect({ payload: getRefreshToken() })
-          } catch (e) {
-            redirect('/signin')
-          }
-        } else {
-          reject(new Error(err?.msg))
-        }
+        reject(new Error(err?.msg))
+        // refreshToken 사용 시
+        // if (err?.code === '401')
       })
     })
   } catch (e) {
@@ -63,11 +49,12 @@ function connect(action) {
   }
 }
 
-function subscribe(socket) {
+function subscribeSocket(socket) {
+  const { socketURL, socketEvent, accessToken } = socket
   return eventChannel((emitter) => {
     socket.on('disconnect', (e) => {
       console.log(`🐶🐶🐶 Client : disconnected 🐶🐶🐶`)
-      emitter(connectIO(getAccessToken()))
+      emitter(connectIO({ socketURL, accessToken }))
     })
 
     socket.on('joinRoom', () => {
@@ -77,6 +64,16 @@ function subscribe(socket) {
     socket.on('refuseToJoin', () => {
       emitter()
     })
+
+    socket.on('ping', () => {
+      emitter()
+    })
+
+    _.map(socketEvent.listener, (item) =>
+      socket.on(item.name, (res) => {
+        emitter(item.actionCreator(res))
+      }),
+    )
 
     return function unsubscribe(socket, emitter) {
       socket.off('disconnect', emitter)
@@ -86,18 +83,11 @@ function subscribe(socket) {
 
 function subscribeRoom(socket) {
   return eventChannel((emitter) => {
-    socket.on('disconnect', (e) => {
-      console.log(`🐶🐶🐶 Client : disconnected 🐶🐶🐶`)
-      emitter(connectIO(getAccessToken()))
-    })
-
-    socket.on('joinRoom', () => {
-      emitter()
-    })
-
-    socket.on('refuseToJoin', () => {
-      emitter()
-    })
+    _.map(socket.roomEvent.listener, (item) =>
+      socket.on(item.name, (res) => {
+        emitter(item.actionCreator(res))
+      }),
+    )
 
     return function unsubscribe(socket, emitter) {
       socket.off('disconnect', emitter)
@@ -118,24 +108,25 @@ function* readRoom(socket) {
   }
 }
 
-function* join(socket) {
+function* joinRoomSaga(socket) {
   while (true) {
     const joinTask = yield take(`${joinRoom}`)
     socket.emit('C2S.joinRoom', joinTask.payload, () => {})
 
     const task = yield fork(readRoom, socket)
+
     const leaveTask = yield take(`${leaveRoom}`)
     yield cancel(task)
     socket.emit('C2S.leaveRoom', leaveTask.payload, () => {})
   }
 }
 
-function* read(socket) {
-  const channel = yield call(subscribe, socket)
+function* readSocketSaga(socket) {
+  const channel = yield call(subscribeSocket, socket)
   while (true) {
     try {
       const { timeout, action } = yield race({
-        timeout: delay(1000000),
+        // timeout: delay(1000000),
         action: take(channel),
       })
       if (timeout) {
@@ -144,7 +135,6 @@ function* read(socket) {
       } else {
         yield put(action)
       }
-      yield put(action)
     } catch (e) {
       console.error(e)
       closeChannel(channel)
@@ -153,8 +143,22 @@ function* read(socket) {
 }
 
 function* handleIO(socket) {
-  yield fork(join, socket)
-  yield fork(read, socket)
+  yield fork(joinRoomSaga, socket)
+  yield fork(readSocketSaga, socket)
+
+  const socketTrigger = socket.socketEvent.trigger
+  for (let i = 0; i < socketTrigger.length; i++) {
+    yield takeEvery(socketTrigger[i].action, () =>
+      socket.emit(socketTrigger[i].name),
+    )
+  }
+
+  const roomTrigger = socket.roomEvent.trigger
+  for (let i = 0; i < roomTrigger.length; i++) {
+    yield takeEvery(roomTrigger[i].action, () =>
+      socket.emit(roomTrigger[i].name),
+    )
+  }
 }
 
 function* flow() {
@@ -162,13 +166,15 @@ function* flow() {
     try {
       const connetTask = yield take(`${connectIO}`)
       const socket = yield call(connect, connetTask)
-      socket.emit('C2S.connect', connetTask.payload)
+      // optional
+      // socket.emit('C2S.connect', connetTask.payload)
 
       const task = yield fork(handleIO, socket)
 
       const disconnectTask = yield take(`${disconnectIO}`)
       yield cancel(task)
-      socket.emit('C2S.disconnet', disconnectTask.payload)
+      // optional
+      // socket.emit('C2S.disconnet', disconnectTask.payload)
     } catch (e) {
       console.error(e)
     }
