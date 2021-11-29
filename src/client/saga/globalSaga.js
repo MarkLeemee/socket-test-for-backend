@@ -1,6 +1,7 @@
 import io from 'socket.io-client'
 import { eventChannel, buffers } from 'redux-saga'
 import { fork, take, call, put, cancel, delay, race } from 'redux-saga/effects'
+
 import {
   login,
   logout,
@@ -11,8 +12,8 @@ import {
   sendData,
   newData,
   newEmit,
-} from './actions'
-import { HOST_NAME, EVENT_NAME } from './config'
+} from '../store/actions'
+import { HOST_NAME, EVENT_NAME } from '../config'
 
 function connect() {
   // 👇👇👇 연결 호스트 및 네임스페이스 설정 👇👇👇
