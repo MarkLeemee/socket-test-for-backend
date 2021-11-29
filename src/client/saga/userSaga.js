@@ -163,16 +163,17 @@ function* handleIO(socket) {
   yield fork(readSocketSaga, socket)
 
   const socketTrigger = socket.socketEvent.trigger
-  for (let i = 0; i < socketTrigger.length; i++) {
-    yield takeEvery(socketTrigger[i].action, (action) =>
-      socket.emit(socketTrigger[i].name, action.payload),
+  const roomTrigger = socket.roomEvent.trigger
+
+  for (let item of socketTrigger) {
+    yield takeEvery(item.action, (action) =>
+      socket.emit(item.name, action.payload),
     )
   }
 
-  const roomTrigger = socket.roomEvent.trigger
-  for (let i = 0; i < roomTrigger.length; i++) {
-    yield takeEvery(roomTrigger[i].action, (action) =>
-      socket.emit(roomTrigger[i].name, action.payload),
+  for (let item of roomTrigger) {
+    yield takeEvery(item.action, (action) =>
+      socket.emit(item.name, action.payload),
     )
   }
 }
