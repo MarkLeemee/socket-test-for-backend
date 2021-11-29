@@ -164,15 +164,15 @@ function* handleIO(socket) {
 
   const socketTrigger = socket.socketEvent.trigger
   for (let i = 0; i < socketTrigger.length; i++) {
-    yield takeEvery(socketTrigger[i].action, () =>
-      socket.emit(socketTrigger[i].name),
+    yield takeEvery(socketTrigger[i].action, (action) =>
+      socket.emit(socketTrigger[i].name, action.payload),
     )
   }
 
   const roomTrigger = socket.roomEvent.trigger
   for (let i = 0; i < roomTrigger.length; i++) {
-    yield takeEvery(roomTrigger[i].action, () =>
-      socket.emit(roomTrigger[i].name),
+    yield takeEvery(roomTrigger[i].action, (action) =>
+      socket.emit(roomTrigger[i].name, action.payload),
     )
   }
 }
